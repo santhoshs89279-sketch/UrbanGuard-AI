@@ -1,0 +1,28 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# YOLO training outputs
+runs/
+
+# YOLO model weights
+*.pt
+*.onnx
+
+# Dataset
+data/raw/
+data/processed/
+data/split/
+
+# IDE files
+.vscode/
+
+# Environment/secrets
+.env
+
+# Java/Maven build files
+backend/target/

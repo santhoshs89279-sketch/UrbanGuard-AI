@@ -1,0 +1,11 @@
+path: data/processed/vehicle
+
+train: train/images
+val: val/images
+test: test/images
+
+names:
+  0: Ambulance
+  1: Bus
+  2: Car
+  3: Truck
