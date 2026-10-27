@@ -17,6 +17,12 @@ runs/
 data/raw/
 data/processed/
 data/split/
+data/accident/
+
+# Local runtime data and logs
+urbanguard.db
+backend/run.err
+backend/run.log
 
 # IDE files
 .vscode/

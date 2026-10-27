@@ -1,46 +1,25 @@
+
 from ultralytics import YOLO
 
-
-# ============================================================
-# URBANGUARD AI - VEHICLE DETECTION MODEL TRAINING
-# ============================================================
-
 def main():
-
-    print("=" * 60)
-    print("URBANGUARD AI - YOLO VEHICLE MODEL TRAINING")
-    print("=" * 60)
-
-    # Load lightweight YOLO model
+    # Load a small YOLO model
     model = YOLO("yolo11n.pt")
 
-    # Train the model
+    # Train the model using your processed dataset
     results = model.train(
         data="config/vehicle_data.yaml",
-
-        epochs=50,
-        imgsz=640,
-
-        batch=4,
-
-        device="cpu",
-
-        workers=0,
-
-        project="models/vehicle_detection",
-        name="yolo11_vehicle",
-
-        patience=15,
-
-        pretrained=True,
-
-        verbose=True
+        epochs=10,
+        imgsz=416,
+        batch=8,
+        workers=2,
+        patience=3,
+        cache=False,
+        project="runs/detect",
+        name="vehicle_fast"
     )
 
-    print("\n" + "=" * 60)
-    print("TRAINING COMPLETED")
-    print("=" * 60)
-
+    print("Training completed!")
+    print(results)
 
 if __name__ == "__main__":
     main()

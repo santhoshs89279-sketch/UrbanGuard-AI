@@ -1,0 +1,25 @@
+
+path: data/accident/Accident Detection.v2i.yolov11
+
+train: train/images
+val: valid/images
+test: test/images
+
+names:
+  0: '0'
+  1: Accident
+  2: Car
+  3: Colision
+  4: Unitario
+  5: Volcadura
+  6: accident
+  7: car
+  8: car-accident
+  9: car-crash
+  10: moderate
+  11: moderate-accident
+  12: no-accident
+  13: object-accident
+  14: severe
+  15: severe-accident
+  16: truck
