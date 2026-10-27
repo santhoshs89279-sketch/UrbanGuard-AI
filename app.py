@@ -1,14 +1,14 @@
-
 from pathlib import Path
 from datetime import datetime
 import time
-from PIL import Image
+
 import cv2
 import pandas as pd
 import requests
 import streamlit as st
 import plotly.express as px
 from ultralytics import YOLO
+from PIL import Image
 
 import database
 
@@ -36,10 +36,12 @@ MODEL_PATHS = [
     ROOT_DIR / "runs" / "detect" / "models" / "vehicle_detection"
     / "yolo11_vehicle-2" / "weights" / "best.pt",
 ]
+
 ACCIDENT_MODEL_PATH = (
     ROOT_DIR / "runs" / "detect" / "accident_fast"
     / "weights" / "best.pt"
 )
+
 
 # =========================================================
 # STYLING
@@ -213,13 +215,13 @@ st.sidebar.divider()
 page = st.sidebar.radio(
     "Navigation",
     [
-    "Live Dashboard",
-    "Live Vehicle Detection",
-    "Accident Detection",
-    "Pollution Monitoring",
-    "Alerts",
-    "Analytics",
-    "About"
+        "Live Dashboard",
+        "Live Vehicle Detection",
+        "Accident Detection",
+        "Pollution Monitoring",
+        "Alerts",
+        "Analytics",
+        "About"
     ]
 )
 
@@ -534,37 +536,31 @@ elif page == "Live Vehicle Detection":
         "or fires, and a single-frame vehicle count is not sufficient to "
         "confirm a traffic jam."
     )
+
+elif page == "same page":
+    pass
+# =========================================================
+# ACCIDENT DETECTION
+# =========================================================
+
 elif page == "Accident Detection":
 
     st.title("🚨 Accident Detection")
     st.write(
-        "Upload a road image to detect possible accident-related "
+        "Upload a road image to check for possible accident-related "
         "objects using your trained YOLO model."
     )
 
-    # Path to the trained accident model
-    ACCIDENT_MODEL_PATH = (
-        ROOT_DIR / "runs" / "detect" / "accident_fast"
-        / "weights" / "best.pt"
+    st.warning(
+        "Prototype only: this model may miss accidents or produce false "
+        "detections. Verify results manually and do not use it for emergency decisions."
     )
 
-    # Check whether the model exists
     if not ACCIDENT_MODEL_PATH.is_file():
         st.error("Accident model not found.")
-        st.code(str(ACCIDENT_MODEL_PATH))
-        st.info(
-            "Check that best.pt exists inside "
-            "runs/detect/accident_fast/weights/"
-        )
-
+        st.code(str(ACCIDENT_MODEL_PATH), language="text")
     else:
-        st.success("Accident model loaded from the expected path.")
-
-        st.warning(
-            "This is a prototype. Predictions can be incorrect. "
-            "Always verify results manually; do not rely on this "
-            "model for emergency decisions."
-        )
+        st.success("Accident model file found.")
 
         confidence = st.slider(
             "Detection confidence",
@@ -583,156 +579,84 @@ elif page == "Accident Detection":
 
         if uploaded_image is not None:
             image = Image.open(uploaded_image).convert("RGB")
+            st.image(image, caption="Uploaded image", use_container_width=True)
 
-            st.image(
-                image,
-                caption="Uploaded image",
-                use_container_width=True
-            )
-
-            if st.button(
-                "Run Accident Detection",
-                type="primary",
-                key="run_accident_detection"
-            ):
+            if st.button("Run Accident Detection", type="primary", key="run_accident_detection"):
                 try:
                     with st.spinner("Analyzing image..."):
-                        accident_model = load_model(
-                            str(ACCIDENT_MODEL_PATH)
-                        )
-
+                        accident_model = load_model(str(ACCIDENT_MODEL_PATH))
                         result = accident_model.predict(
                             source=image,
                             conf=confidence,
                             verbose=False
                         )[0]
 
-                    # Display image with bounding boxes
-                    annotated_image = result.plot()
-                    annotated_image = cv2.cvtColor(
-                        annotated_image,
-                        cv2.COLOR_BGR2RGB
-                    )
-
-                    st.subheader("Detection Results")
-
-                    st.image(
-                        annotated_image,
-                        caption="YOLO prediction",
-                        use_container_width=True
-                    )
-
-                    # Extract detected objects
+                    annotated = cv2.cvtColor(result.plot(), cv2.COLOR_BGR2RGB)
+                    st.session_state["accident_result_image"] = annotated
                     names = result.names
                     detections = []
-
-                    accident_classes = {
-                        "accident",
-                        "car-accident",
-                        "car-crash",
-                        "moderate-accident",
-                        "severe-accident",
-                        "object-accident",
-                        "colision",
-                        "volcadura"
-                    }
-
                     if result.boxes is not None:
                         for box in result.boxes:
                             class_id = int(box.cls.item())
-
-                            if isinstance(names, dict):
-                                class_name = names.get(
-                                    class_id,
-                                    str(class_id)
-                                )
-                            else:
-                                class_name = names[class_id]
-
-                            score = float(box.conf.item())
-
+                            class_name = names.get(class_id, str(class_id)) if isinstance(names, dict) else names[class_id]
                             detections.append({
-                                "Class": class_name,
-                                "Confidence": round(score, 3)
+                                "Class": str(class_name),
+                                "Confidence": round(float(box.conf.item()), 3)
                             })
-
-                    if detections:
-                        st.dataframe(
-                            pd.DataFrame(detections),
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                    else:
-                        st.info(
-                            "No objects detected at this confidence "
-                            "level. This does not prove that the image "
-                            "is accident-free."
-                        )
-
-                    # Identify accident-related detections
-                    accident_detections = [
-                        item for item in detections
-                        if item["Class"].strip().lower()
-                        in accident_classes
-                    ]
-
-                    if accident_detections:
-                        st.error(
-                            "Possible accident-related objects detected. "
-                            "Please verify the result manually."
-                        )
-
-                        summary = ", ".join(
-                            f'{item["Class"]} '
-                            f'({item["Confidence"]:.0%})'
-                            for item in accident_detections
-                        )
-
-                        severity = (
-                            "High"
-                            if any(
-                                item["Class"].strip().lower()
-                                == "severe-accident"
-                                for item in accident_detections
-                            )
-                            else "Medium"
-                        )
-
-                        # Save the alert immediately when detection runs.
-                        # This avoids losing the results on a button rerun.
-                        if st.session_state.get(
-                            "last_accident_alert_image"
-                        ) != uploaded_image.name + summary:
-                            add_alert(
-                                "Accident Detection",
-                                f"Image prediction: {summary}",
-                                severity
-                            )
-
-                            st.session_state[
-                                "last_accident_alert_image"
-                            ] = uploaded_image.name + summary
-
-                            st.success(
-                                "Accident alert saved to the database."
-                            )
-                        else:
-                            st.info(
-                                "This result has already been saved "
-                                "as an alert in this session."
-                            )
-
-                    else:
-                        st.info(
-                            "No configured accident-related classes "
-                            "were detected. The model may still miss "
-                            "an accident."
-                        )
-
+                    st.session_state["accident_detections"] = detections
+                    st.session_state["accident_summary_key"] = uploaded_image.name + str(detections)
+                    st.session_state["accident_image_name"] = uploaded_image.name
+                    st.session_state["accident_saved_key"] = None
                 except Exception as exc:
-                    st.error(
-                        f"Accident detection failed: {exc}"
+                    st.error(f"Accident detection failed: {exc}")
+
+        # Persist and display the result after Streamlit reruns.
+        if st.session_state.get("accident_result_image") is not None:
+            st.subheader("Detection Results")
+            st.image(
+                st.session_state["accident_result_image"],
+                caption="YOLO model predictions",
+                use_container_width=True
+            )
+
+            detections = st.session_state.get("accident_detections", [])
+            if detections:
+                st.dataframe(pd.DataFrame(detections), use_container_width=True, hide_index=True)
+            else:
+                st.info("No objects detected at this confidence level. This does not prove the image is accident-free.")
+
+            accident_classes = {
+                "accident", "car-accident", "car-crash", "moderate-accident",
+                "severe-accident", "object-accident", "colision", "volcadura"
+            }
+            accident_detections = [
+                item for item in detections
+                if item["Class"].strip().lower() in accident_classes
+            ]
+
+            if accident_detections:
+                st.error("Possible accident-related classes detected. Please verify manually.")
+                summary = ", ".join(
+                    f'{item["Class"]} ({item["Confidence"]:.0%})'
+                    for item in accident_detections
+                )
+                severity = "High" if any(
+                    item["Class"].strip().lower() == "severe-accident"
+                    for item in accident_detections
+                ) else "Medium"
+                current_key = st.session_state.get("accident_summary_key")
+                if st.session_state.get("accident_saved_key") == current_key:
+                    st.success("Accident alert saved to the database.")
+                elif st.button("Save Accident Alert", type="primary", key="save_accident_alert"):
+                    add_alert(
+                        "Accident Detection",
+                        f"Image prediction ({st.session_state.get('accident_image_name', 'uploaded image')}): {summary}",
+                        severity
                     )
+                    st.session_state["accident_saved_key"] = current_key
+                    st.success("Accident alert saved to the database.")
+            else:
+                st.info("No configured accident-related classes were detected. The model may still miss an accident.")
 
 
 # =========================================================
@@ -954,7 +878,7 @@ elif page == "Alerts":
         "I understand that deleting alert history is permanent."
     )
 
-    if st.button("🗑 Clear All Alerts", disabled=not confirm_delete):
+    if st.button("🗑️ Clear All Alerts", disabled=not confirm_delete):
         database.clear_alerts()
         st.success("Alert history cleared.")
         st.rerun()
@@ -1104,8 +1028,9 @@ elif page == "About":
 
     ### Current limitations
 
-    - The current vehicle model does not detect accidents or fires.
-    - A dedicated, trained model is required for accident or fire detection.
+    - Accident detection is an experimental image-upload feature using a separate trained model.
+    - Accident predictions can be wrong or missed and must be verified manually.
+    - Fire detection is not implemented.
     - Traffic counts alone do not reliably establish congestion.
     - Air-quality readings are API-provided, not local sensor readings.
     - Camera monitoring stops when the detection run finishes.
